@@ -19,7 +19,7 @@ services:
 
   ui:
     build: .
-    command: streamlit run src/ui/app.py --server.port=8501 --server.address=0.0.0.0
+    command: streamlit run src/ui/app.py --server.port=8501 --server.address=0.0.0.0 --client.showSidebarNavigation=false
     ports:
       - "0.0.0.0:8501:8501"
     environment:
