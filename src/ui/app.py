@@ -1,6 +1,13 @@
-"""Streamlit メインアプリ - ページルーティング"""
+"""Streamlit メインアプリ"""
 
 import streamlit as st
+
+from src.ui.views.dashboard import render as dashboard
+from src.ui.views.learning import render as learning
+from src.ui.views.portfolio import render as portfolio
+from src.ui.views.screening import render as screening
+from src.ui.views.settings import render as settings
+from src.ui.views.simulation import render as simulation
 
 st.set_page_config(
     page_title="traders-tool",
@@ -9,46 +16,22 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-PAGE_LABELS = ["ダッシュボード", "ポートフォリオ管理", "スクリーニング", "学習", "シミュレーション", "設定"]
-PAGE_KEYS = ["dashboard", "portfolio", "screening", "learning", "simulation", "settings"]
-_label_to_key = dict(zip(PAGE_LABELS, PAGE_KEYS))
-_key_to_index = {k: i for i, k in enumerate(PAGE_KEYS)}
-
-# URLからページを復元（リロード対応）
-_qp = st.query_params.get("page", "dashboard")
-_default_index = _key_to_index.get(_qp, 0)
-
 st.sidebar.title("traders-tool")
 st.sidebar.caption("ずぼら x 低リスク 株式投資ツール")
 st.sidebar.divider()
 
-page = st.sidebar.radio(
-    "メニュー",
-    options=PAGE_LABELS,
-    index=_default_index,
-    label_visibility="collapsed",
+nav = st.navigation(
+    [
+        st.Page(dashboard, title="ダッシュボード", url_path="dashboard", default=True),
+        st.Page(portfolio, title="ポートフォリオ管理", url_path="portfolio"),
+        st.Page(screening, title="スクリーニング", url_path="screening"),
+        st.Page(learning, title="学習", url_path="learning"),
+        st.Page(simulation, title="シミュレーション", url_path="simulation"),
+        st.Page(settings, title="設定", url_path="settings"),
+    ]
 )
 
 st.sidebar.divider()
 st.sidebar.caption("v0.3.0")
 
-selected = _label_to_key[page]
-
-# URLバーを同期（リロード時にページ保持）
-if st.query_params.get("page") != selected:
-    st.query_params["page"] = selected
-
-if selected == "dashboard":
-    from src.ui.views.dashboard import render
-elif selected == "portfolio":
-    from src.ui.views.portfolio import render
-elif selected == "screening":
-    from src.ui.views.screening import render
-elif selected == "learning":
-    from src.ui.views.learning import render
-elif selected == "simulation":
-    from src.ui.views.simulation import render
-elif selected == "settings":
-    from src.ui.views.settings import render
-
-render()
+nav.run()
