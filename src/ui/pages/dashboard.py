@@ -9,7 +9,7 @@ from src.ui.components.alert_banner import render_alert_banner
 from src.ui.components.signal_card import render_signal_card
 from src.ui.components.sector_heatmap import render_sector_heatmap
 
-API_BASE = "http://localhost:8000"
+from src.ui.config import API_BASE
 
 
 def _api_get(path: str, default=None):

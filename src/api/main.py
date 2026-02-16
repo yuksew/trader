@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
@@ -33,9 +34,15 @@ app = FastAPI(
 )
 
 # CORS - Streamlit (default port 8501) からのアクセスを許可
+_default_origins = "http://localhost:8501,http://127.0.0.1:8501"
+_cors_origins = [
+    o.strip()
+    for o in os.environ.get("TRADERS_CORS_ORIGINS", _default_origins).split(",")
+    if o.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8501", "http://127.0.0.1:8501"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

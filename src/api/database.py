@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
@@ -10,7 +11,8 @@ from typing import Generator
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DB_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "traders.db"
+_env_db_path = os.environ.get("TRADERS_DB_PATH")
+DEFAULT_DB_PATH = Path(_env_db_path) if _env_db_path else Path(__file__).resolve().parent.parent.parent / "data" / "traders.db"
 
 _SCHEMA_SQL = """
 -- portfolios

@@ -1,0 +1,30 @@
+services:
+  api:
+    build: .
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - TRADERS_DB_PATH=/app/data/traders.db
+      - TRADERS_CORS_ORIGINS=http://localhost:8501,http://ui:8501
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  ui:
+    build: .
+    command: streamlit run src/ui/app.py --server.port=8501 --server.address=0.0.0.0
+    ports:
+      - "0.0.0.0:8501:8501"
+    environment:
+      - API_BASE=http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped

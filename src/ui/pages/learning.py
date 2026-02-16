@@ -3,7 +3,7 @@
 import streamlit as st
 import requests
 
-API_BASE = "http://localhost:8000"
+from src.ui.config import API_BASE
 
 
 def _api_get(path: str, default=None):
