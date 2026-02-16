@@ -91,7 +91,7 @@ async def add_holding(portfolio_id: int, body: HoldingAdd) -> dict:
             body.sector,
             body.shares,
             body.buy_price,
-            body.buy_date.isoformat(),
+            body.buy_date.isoformat() if body.buy_date else None,
             now,
         ),
     )

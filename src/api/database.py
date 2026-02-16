@@ -1,7 +1,4 @@
-"""Database initialization and connection management.
-
-Creates all tables defined in the integrated specification (Section 3).
-"""
+"""Database initialization and connection management."""
 
 from __future__ import annotations
 
@@ -33,6 +30,8 @@ CREATE TABLE IF NOT EXISTS holdings (
     shares        REAL    NOT NULL DEFAULT 0,
     buy_price     REAL    NOT NULL DEFAULT 0,
     buy_date      DATE,
+    stop_loss_pct REAL    NOT NULL DEFAULT -10.0,
+    trailing_stop BOOLEAN NOT NULL DEFAULT 0,
     created_at    DATETIME NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -125,63 +124,19 @@ CREATE TABLE IF NOT EXISTS price_cache (
     PRIMARY KEY (ticker, date)
 );
 
--- user_profile (education stage / level / XP)
-CREATE TABLE IF NOT EXISTS user_profile (
-    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-    stage               INTEGER NOT NULL DEFAULT 1,
-    level               INTEGER NOT NULL DEFAULT 1,
-    xp                  INTEGER NOT NULL DEFAULT 0,
-    safe_mode           BOOLEAN NOT NULL DEFAULT 0,
-    login_streak        INTEGER NOT NULL DEFAULT 0,
-    last_login_date     DATE,
-    total_login_days    INTEGER NOT NULL DEFAULT 0,
-    stage_upgraded_at   DATETIME,
-    self_declared_stage INTEGER,
-    created_at          DATETIME NOT NULL DEFAULT (datetime('now'))
-);
-
--- user_xp_log
-CREATE TABLE IF NOT EXISTS user_xp_log (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id     INTEGER NOT NULL REFERENCES user_profile(id),
-    action_type TEXT    NOT NULL,
-    xp_earned   INTEGER NOT NULL,
-    created_at  DATETIME NOT NULL DEFAULT (datetime('now'))
-);
-
--- user_badges
-CREATE TABLE IF NOT EXISTS user_badges (
-    id        INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id   INTEGER NOT NULL REFERENCES user_profile(id),
-    badge_id  TEXT    NOT NULL,
-    earned_at DATETIME NOT NULL DEFAULT (datetime('now'))
-);
-
 -- learning_cards
 CREATE TABLE IF NOT EXISTS learning_cards (
     id                  INTEGER PRIMARY KEY AUTOINCREMENT,
     card_key            TEXT    UNIQUE NOT NULL,
     title               TEXT    NOT NULL,
-    content_lv1         TEXT    NOT NULL DEFAULT '',
-    content_lv2         TEXT    NOT NULL DEFAULT '',
-    content_lv3         TEXT    NOT NULL DEFAULT '',
-    content_lv4         TEXT    NOT NULL DEFAULT '',
+    content             TEXT    NOT NULL DEFAULT '',
     category            TEXT    NOT NULL DEFAULT 'term',
     related_signal_type TEXT
-);
-
--- user_card_history
-CREATE TABLE IF NOT EXISTS user_card_history (
-    id        INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id   INTEGER NOT NULL REFERENCES user_profile(id),
-    card_id   INTEGER NOT NULL REFERENCES learning_cards(id),
-    viewed_at DATETIME NOT NULL DEFAULT (datetime('now'))
 );
 
 -- simulation_trades (paper trading)
 CREATE TABLE IF NOT EXISTS simulation_trades (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id         INTEGER NOT NULL REFERENCES user_profile(id),
     ticker          TEXT    NOT NULL,
     action          TEXT    NOT NULL,
     price           REAL    NOT NULL,
@@ -190,45 +145,9 @@ CREATE TABLE IF NOT EXISTS simulation_trades (
     created_at      DATETIME NOT NULL DEFAULT (datetime('now'))
 );
 
--- signal_outcomes
-CREATE TABLE IF NOT EXISTS signal_outcomes (
-    id               INTEGER PRIMARY KEY AUTOINCREMENT,
-    signal_id        INTEGER NOT NULL REFERENCES signals(id),
-    user_id          INTEGER NOT NULL REFERENCES user_profile(id),
-    user_action      TEXT    NOT NULL DEFAULT 'ignored',
-    price_at_signal  REAL,
-    price_after_7d   REAL,
-    price_after_30d  REAL,
-    is_success       BOOLEAN
-);
-
--- alert_outcomes
-CREATE TABLE IF NOT EXISTS alert_outcomes (
-    id               INTEGER PRIMARY KEY AUTOINCREMENT,
-    alert_id         INTEGER NOT NULL REFERENCES alerts(id),
-    user_id          INTEGER NOT NULL REFERENCES user_profile(id),
-    user_action      TEXT    NOT NULL DEFAULT 'ignored',
-    action_detail    TEXT,
-    price_at_alert   REAL,
-    price_after_7d   REAL,
-    price_after_30d  REAL,
-    portfolio_impact REAL
-);
-
--- education_logs
-CREATE TABLE IF NOT EXISTS education_logs (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id    INTEGER NOT NULL REFERENCES user_profile(id),
-    event_type TEXT    NOT NULL,
-    target_id  TEXT,
-    context    TEXT,
-    created_at DATETIME NOT NULL DEFAULT (datetime('now'))
-);
-
 -- simulation_scenarios (What-If)
 CREATE TABLE IF NOT EXISTS simulation_scenarios (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id         INTEGER NOT NULL REFERENCES user_profile(id),
     scenario_type   TEXT    NOT NULL,
     parameters      TEXT,
     result_summary  TEXT,
@@ -236,7 +155,7 @@ CREATE TABLE IF NOT EXISTS simulation_scenarios (
     created_at      DATETIME NOT NULL DEFAULT (datetime('now'))
 );
 
--- Indexes for common queries
+-- Indexes
 CREATE INDEX IF NOT EXISTS idx_holdings_portfolio ON holdings(portfolio_id);
 CREATE INDEX IF NOT EXISTS idx_holdings_ticker ON holdings(ticker);
 CREATE INDEX IF NOT EXISTS idx_signals_ticker ON signals(ticker);
@@ -246,34 +165,16 @@ CREATE INDEX IF NOT EXISTS idx_alerts_unread ON alerts(is_read, is_resolved);
 CREATE INDEX IF NOT EXISTS idx_risk_metrics_portfolio_date ON risk_metrics(portfolio_id, date);
 CREATE INDEX IF NOT EXISTS idx_screening_date ON screening_results(date);
 CREATE INDEX IF NOT EXISTS idx_price_cache_ticker ON price_cache(ticker);
-
--- Education indexes
-CREATE INDEX IF NOT EXISTS idx_user_xp_log_user ON user_xp_log(user_id);
-CREATE INDEX IF NOT EXISTS idx_user_badges_user ON user_badges(user_id);
-CREATE INDEX IF NOT EXISTS idx_user_card_history_user ON user_card_history(user_id);
-CREATE INDEX IF NOT EXISTS idx_simulation_trades_user ON simulation_trades(user_id);
-CREATE INDEX IF NOT EXISTS idx_signal_outcomes_user ON signal_outcomes(user_id);
-CREATE INDEX IF NOT EXISTS idx_signal_outcomes_signal ON signal_outcomes(signal_id);
-CREATE INDEX IF NOT EXISTS idx_alert_outcomes_user ON alert_outcomes(user_id);
-CREATE INDEX IF NOT EXISTS idx_alert_outcomes_alert ON alert_outcomes(alert_id);
-CREATE INDEX IF NOT EXISTS idx_education_logs_user ON education_logs(user_id);
-CREATE INDEX IF NOT EXISTS idx_simulation_scenarios_user ON simulation_scenarios(user_id);
 """
 
 
 def get_db_path() -> Path:
-    """Return the resolved database file path."""
     return DEFAULT_DB_PATH
 
 
 def init_db(db_path: str | Path | None = None) -> None:
-    """Create all tables if they don't exist.
-
-    Safe to call multiple times (uses CREATE TABLE IF NOT EXISTS).
-    """
     path = Path(db_path) if db_path else DEFAULT_DB_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
-
     conn = sqlite3.connect(str(path))
     try:
         conn.execute("PRAGMA journal_mode=WAL")
@@ -287,13 +188,6 @@ def init_db(db_path: str | Path | None = None) -> None:
 
 @contextmanager
 def get_connection(db_path: str | Path | None = None) -> Generator[sqlite3.Connection, None, None]:
-    """Context manager that yields a SQLite connection.
-
-    Usage::
-
-        with get_connection() as conn:
-            conn.execute("SELECT ...")
-    """
     path = Path(db_path) if db_path else DEFAULT_DB_PATH
     conn = sqlite3.connect(str(path))
     conn.execute("PRAGMA journal_mode=WAL")
@@ -309,13 +203,7 @@ def get_connection(db_path: str | Path | None = None) -> Generator[sqlite3.Conne
         conn.close()
 
 
-# ---------------------------------------------------------------------------
-# Async helpers (used by FastAPI async endpoints)
-# ---------------------------------------------------------------------------
-
 class _AsyncDB:
-    """Thin async wrapper around synchronous sqlite3 for FastAPI usage."""
-
     def __init__(self, conn: sqlite3.Connection) -> None:
         self._conn = conn
 
@@ -325,18 +213,14 @@ class _AsyncDB:
 
     async def execute_fetchall(self, sql: str, params: tuple = ()) -> list[sqlite3.Row]:
         import asyncio
-
         def _run() -> list[sqlite3.Row]:
             return self._conn.execute(sql, params).fetchall()
-
         return await asyncio.to_thread(_run)
 
     async def execute_fetchone(self, sql: str, params: tuple = ()) -> sqlite3.Row | None:
         import asyncio
-
         def _run() -> sqlite3.Row | None:
             return self._conn.execute(sql, params).fetchone()
-
         return await asyncio.to_thread(_run)
 
     async def commit(self) -> None:
@@ -348,7 +232,6 @@ _async_db: _AsyncDB | None = None
 
 
 async def init_db_async(db_path: str | Path | None = None) -> None:
-    """Async init_db: creates tables and keeps a persistent connection."""
     init_db(db_path)
     global _async_db
     path = Path(db_path) if db_path else DEFAULT_DB_PATH
@@ -360,7 +243,6 @@ async def init_db_async(db_path: str | Path | None = None) -> None:
 
 
 async def get_db() -> _AsyncDB:
-    """Return the async DB wrapper. Call init_db_async first."""
     global _async_db
     if _async_db is None:
         await init_db_async()

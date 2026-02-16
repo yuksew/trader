@@ -16,11 +16,11 @@ class PortfolioCreate(BaseModel):
 
 class HoldingAdd(BaseModel):
     ticker: str = Field(..., description="銘柄コード (例: 7203.T)")
-    name: str = Field(..., description="銘柄名")
+    name: str = Field("", description="銘柄名")
     sector: str = Field("", description="セクター")
     shares: float = Field(..., gt=0, description="保有株数")
     buy_price: float = Field(..., gt=0, description="平均取得価格")
-    buy_date: date = Field(..., description="取得日")
+    buy_date: Optional[date] = Field(None, description="取得日")
 
 
 class HoldingResponse(BaseModel):
@@ -31,7 +31,7 @@ class HoldingResponse(BaseModel):
     sector: str
     shares: float
     buy_price: float
-    buy_date: date
+    buy_date: Optional[date] = None
     created_at: datetime
 
 
@@ -49,7 +49,7 @@ class PortfolioDetailResponse(PortfolioResponse):
 
 class WatchlistAdd(BaseModel):
     ticker: str = Field(..., description="銘柄コード")
-    name: str = Field(..., description="銘柄名")
+    name: str = Field("", description="銘柄名")
     reason: str = Field("", description="追加理由")
 
 
@@ -173,89 +173,18 @@ class JobTriggerResponse(BaseModel):
     message: str
 
 
-# ---------- Education: User Profile ----------
-
-class UserProfileResponse(BaseModel):
-    id: int
-    stage: int
-    level: int
-    xp: int
-    safe_mode: bool
-    login_streak: int
-    total_login_days: int
-    last_login_date: Optional[str] = None
-    stage_upgraded_at: Optional[str] = None
-    created_at: str
-
-
-class XPAddRequest(BaseModel):
-    action_type: str = Field(..., description="XP獲得アクション種別")
-    context: str = Field("", description="発生コンテキスト")
-
-
-class XPAddResponse(BaseModel):
-    xp_earned: int
-    total_xp: int
-    level: int
-    level_up: bool = False
-    new_level_name: Optional[str] = None
-
-
-class BadgeResponse(BaseModel):
-    badge_id: str
-    earned_at: str
-
-
-class UserProgressResponse(BaseModel):
-    stage: int
-    stage_name: str
-    level: int
-    level_name: str
-    xp: int
-    xp_to_next_level: int
-    total_login_days: int
-    login_streak: int
-    badges_count: int
-    cards_viewed: int
-    signals_explained: int
-    simulations_run: int
-
-
-class SafeModeRequest(BaseModel):
-    enabled: bool = Field(..., description="セーフモード有効/無効")
-
-
-class SafeModeResponse(BaseModel):
-    safe_mode: bool
-
-
-class GuardrailsResponse(BaseModel):
-    stage: int
-    safe_mode: bool
-    stop_loss_editable: bool
-    stop_loss_range: list[float]
-    concentration_limit: float
-    concentration_action: str
-    low_health_action: str
-    high_volatility_action: str
-    settings_editable: str
-
-
-# ---------- Education: Glossary ----------
+# ---------- Glossary ----------
 
 class GlossaryTermResponse(BaseModel):
     term: str
     reading: str = ""
-    display_name_lv1: str
-    description_lv1: str
-    description_lv2: str
-    description_lv3: str
-    description_lv4: str
+    display_name: str
+    description: str
     image_metaphor: str = ""
     related_features: list[str] = []
 
 
-# ---------- Education: Learning Cards ----------
+# ---------- Learning Cards ----------
 
 class LearningCardResponse(BaseModel):
     id: int
@@ -264,30 +193,6 @@ class LearningCardResponse(BaseModel):
     content: str
     category: str
     related_signal_type: Optional[str] = None
-    viewed: bool = False
-
-
-class CardViewedResponse(BaseModel):
-    card_id: int
-    xp_earned: int
-
-
-# ---------- Education: Explanations ----------
-
-class SignalExplanationResponse(BaseModel):
-    signal_id: int
-    signal_type: str
-    ticker: str
-    explanation: str
-    stage: int
-
-
-class AlertExplanationResponse(BaseModel):
-    alert_id: int
-    alert_type: str
-    ticker: Optional[str] = None
-    explanation: str
-    stage: int
 
 
 # ---------- Simulation ----------
@@ -325,8 +230,8 @@ class PaperPortfolioResponse(BaseModel):
 class WhatIfRequest(BaseModel):
     scenario_type: str = Field(
         ...,
-        pattern="^(stop_loss|concentration|stress_test|diversification)$",
-        description="シナリオ種別",
+        pattern="^(stop_loss|concentration)$",
+        description="シナリオ種別 (stop_loss or concentration)",
     )
     parameters: dict = Field(default_factory=dict, description="シナリオパラメータ (JSON)")
 
@@ -345,49 +250,16 @@ class SimulationResultResponse(BaseModel):
 class WeeklyReviewResponse(BaseModel):
     period_start: str
     period_end: str
-    signal_accuracy: Optional[float] = None
     signals_total: int = 0
-    signals_hit: int = 0
     alerts_total: int = 0
     alerts_acted: int = 0
-    xp_earned: int = 0
-    cards_viewed: int = 0
     highlights: list[str] = []
 
 
 class MonthlyReviewResponse(BaseModel):
     period_start: str
     period_end: str
-    signal_accuracy: Optional[float] = None
-    alert_response_rate: Optional[float] = None
-    xp_earned: int = 0
-    level_change: int = 0
-    badges_earned: list[str] = []
-    simulations_run: int = 0
-    if_followed_pnl: Optional[float] = None
+    signals_total: int = 0
+    alerts_total: int = 0
+    alerts_acted: int = 0
     highlights: list[str] = []
-
-
-class SignalOutcomeResponse(BaseModel):
-    signal_id: int
-    ticker: str
-    signal_type: str
-    user_action: str
-    price_at_signal: Optional[float] = None
-    price_after_7d: Optional[float] = None
-    price_after_30d: Optional[float] = None
-    is_success: Optional[bool] = None
-    pnl_7d_pct: Optional[float] = None
-    pnl_30d_pct: Optional[float] = None
-
-
-class AlertOutcomeResponse(BaseModel):
-    alert_id: int
-    alert_type: str
-    ticker: Optional[str] = None
-    user_action: str
-    action_detail: Optional[str] = None
-    price_at_alert: Optional[float] = None
-    price_after_7d: Optional[float] = None
-    price_after_30d: Optional[float] = None
-    portfolio_impact: Optional[float] = None

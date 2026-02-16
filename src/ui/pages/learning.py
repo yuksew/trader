@@ -27,9 +27,6 @@ def _render_glossary() -> None:
         st.info("用語集を読み込み中...")
         return
 
-    user_stage = st.session_state.get("user_stage", 1)
-
-    # 検索フィルタリング
     if search:
         search_lower = search.lower()
         glossary = [
@@ -46,30 +43,16 @@ def _render_glossary() -> None:
     for term in glossary:
         term_name = term.get("term", "")
         reading = term.get("reading", "")
+        display_name = term.get("display_name", "")
         header = f"{term_name}（{reading}）" if reading else term_name
+        if display_name:
+            header += f" - {display_name}"
 
         with st.expander(header):
-            # ステージ別表示
-            if user_stage <= 1:
-                plain = term.get("plain_description", term.get("description", ""))
-                st.markdown(plain)
-                metaphor = term.get("metaphor")
-                if metaphor:
-                    st.caption(f"イメージ: {metaphor}")
-            elif user_stage == 2:
-                plain = term.get("plain_description", "")
-                formal = term.get("description", "")
-                st.markdown(f"{plain}")
-                if formal and formal != plain:
-                    st.caption(f"専門的には: {formal}")
-            else:
-                st.markdown(term.get("description", ""))
-                formula = term.get("formula")
-                if formula:
-                    st.code(formula, language=None)
-
-            # XP記録
-            _record_glossary_viewed(term.get("id", term_name))
+            st.markdown(term.get("description", ""))
+            metaphor = term.get("image_metaphor")
+            if metaphor:
+                st.caption(f"イメージ: {metaphor}")
 
 
 def _render_learning_cards() -> None:
@@ -77,7 +60,6 @@ def _render_learning_cards() -> None:
     st.subheader("学習カード一覧")
     st.caption("投資の知識を少しずつ身につけましょう")
 
-    # カテゴリフィルタ
     categories = {
         "all": "すべて",
         "term": "用語",
@@ -101,52 +83,16 @@ def _render_learning_cards() -> None:
     if selected_cat != "all":
         cards = [c for c in cards if c.get("category") == selected_cat]
 
-    # 閲覧済みフラグの表示
-    viewed_ids = st.session_state.get("viewed_card_ids", set())
-
     if not cards:
         st.info("このカテゴリにはカードがありません。")
         return
 
     for card in cards:
-        card_id = card.get("id", 0)
         title = card.get("title", "")
         content = card.get("content", "")
-        is_viewed = card_id in viewed_ids or card.get("viewed", False)
 
-        icon = "white_check_mark" if is_viewed else "book"
-        with st.expander(f":{icon}: {title}"):
+        with st.expander(f":book: {title}"):
             st.markdown(content)
-            if not is_viewed:
-                if st.button("読んだ", key=f"read_card_{card_id}"):
-                    if "viewed_card_ids" not in st.session_state:
-                        st.session_state["viewed_card_ids"] = set()
-                    st.session_state["viewed_card_ids"].add(card_id)
-                    _record_card_viewed(card_id)
-                    st.rerun()
-
-
-def _record_glossary_viewed(term_id) -> None:
-    """用語閲覧をAPI記録"""
-    try:
-        requests.post(
-            f"{API_BASE}/api/user/xp",
-            json={"action_type": "glossary_viewed", "target_id": str(term_id)},
-            timeout=5,
-        )
-    except Exception:
-        pass
-
-
-def _record_card_viewed(card_id: int) -> None:
-    """カード閲覧をAPI記録"""
-    try:
-        requests.post(
-            f"{API_BASE}/api/learning/cards/{card_id}/viewed",
-            timeout=5,
-        )
-    except Exception:
-        pass
 
 
 def render() -> None:
