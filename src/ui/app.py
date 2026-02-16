@@ -16,10 +16,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-st.sidebar.title("traders-tool")
-st.sidebar.caption("ずぼら x 低リスク 株式投資ツール")
-st.sidebar.divider()
-
 nav = st.navigation(
     [
         st.Page(dashboard, title="ダッシュボード", url_path="dashboard", default=True),
@@ -30,8 +26,5 @@ nav = st.navigation(
         st.Page(settings, title="設定", url_path="settings"),
     ]
 )
-
-st.sidebar.divider()
-st.sidebar.caption("v0.3.0")
 
 nav.run()
