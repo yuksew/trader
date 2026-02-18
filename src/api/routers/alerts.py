@@ -54,3 +54,55 @@ async def mark_alert_read(alert_id: int) -> dict:
     result = dict(row)
     result["is_read"] = True
     return result
+
+
+@router.put("/alerts/{alert_id}/resolve", response_model=AlertResponse)
+async def resolve_alert(alert_id: int) -> dict:
+    """アラートを解決済みにする。"""
+    db = await get_db()
+    row = await db.execute_fetchone(
+        "SELECT id, portfolio_id, ticker, alert_type, level, message, "
+        "action_suggestion, is_read, is_resolved, created_at, resolved_at "
+        "FROM alerts WHERE id = ?",
+        (alert_id,),
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Alert not found")
+
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    await db.execute(
+        "UPDATE alerts SET is_resolved = 1, resolved_at = ? WHERE id = ?",
+        (now, alert_id),
+    )
+    await db.commit()
+
+    result = dict(row)
+    result["is_resolved"] = True
+    result["resolved_at"] = now
+    return result
+
+
+@router.put(
+    "/portfolios/{portfolio_id}/alerts/resolve-all",
+    response_model=list[AlertResponse],
+)
+async def resolve_all_alerts(portfolio_id: int) -> list[dict]:
+    """ポートフォリオの未解決アラートを一括で解決済みにする。"""
+    db = await get_db()
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+
+    await db.execute(
+        "UPDATE alerts SET is_resolved = 1, resolved_at = ? "
+        "WHERE portfolio_id = ? AND is_resolved = 0",
+        (now, portfolio_id),
+    )
+    await db.commit()
+
+    rows = await db.execute_fetchall(
+        "SELECT id, portfolio_id, ticker, alert_type, level, message, "
+        "action_suggestion, is_read, is_resolved, created_at, resolved_at "
+        "FROM alerts WHERE portfolio_id = ? AND resolved_at = ? "
+        "ORDER BY level DESC, created_at DESC",
+        (portfolio_id, now),
+    )
+    return [dict(r) for r in rows]

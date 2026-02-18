@@ -1,7 +1,9 @@
 """アラートバナーコンポーネント"""
 
+import requests
 import streamlit as st
 
+from src.ui.config import API_BASE
 
 _LEVEL_LABEL = {
     4: "危険",
@@ -9,6 +11,16 @@ _LEVEL_LABEL = {
     2: "注意",
     1: "情報",
 }
+
+
+def _resolve_alert(alert_id: int) -> bool:
+    """APIを呼んでアラートを解決済みにする。"""
+    try:
+        resp = requests.put(f"{API_BASE}/api/alerts/{alert_id}/resolve", timeout=10)
+        resp.raise_for_status()
+        return True
+    except Exception:
+        return False
 
 
 def render_alert_banner(alerts: list[dict]) -> None:
@@ -25,6 +37,7 @@ def render_alert_banner(alerts: list[dict]) -> None:
     st.markdown(f"### :warning: アラート ({len(active)}件)")
 
     for alert in active:
+        alert_id = alert.get("id")
         level = alert.get("level", 1)
         label = _LEVEL_LABEL.get(level, "情報")
 
@@ -39,9 +52,19 @@ def render_alert_banner(alerts: list[dict]) -> None:
         if detail:
             body += f"\n\n根拠: {detail}"
 
-        if level >= 4:
-            st.error(body)
-        elif level == 3:
-            st.warning(body)
-        else:
-            st.info(body)
+        col_body, col_btn = st.columns([5, 1])
+        with col_body:
+            if level >= 4:
+                st.error(body)
+            elif level == 3:
+                st.warning(body)
+            else:
+                st.info(body)
+        with col_btn:
+            if alert_id is not None and st.button(
+                "解決", key=f"resolve_{alert_id}"
+            ):
+                if _resolve_alert(alert_id):
+                    st.rerun()
+                else:
+                    st.error("解決に失敗しました")
